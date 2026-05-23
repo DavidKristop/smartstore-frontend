@@ -1,0 +1,117 @@
+"use client";
+
+import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
+import Link from "next/link";
+import {
+    DefaultValues,
+    FieldValues,
+    Path,
+    SubmitHandler,
+    useForm,
+} from "react-hook-form";
+import { ZodType } from "zod";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import ROUTES from "@/constants/routes";
+
+interface AuthFormProps<T extends FieldValues> {
+    schema: ZodType<T>;
+    defaultValues: T;
+    onSubmit: (data: T) => Promise<{ success: boolean }>;
+    formType: "SIGN_IN" | "SIGN_UP";
+}
+
+const AuthForm = <T extends FieldValues>({
+                                             schema,
+                                             defaultValues,
+                                             formType,
+                                             onSubmit,
+                                         }: AuthFormProps<T>) => {
+    const form = useForm<T>({
+        resolver: standardSchemaResolver(schema),
+        defaultValues: defaultValues as DefaultValues<T>,
+    });
+
+    const handleSubmit: SubmitHandler<T> = async () => {
+        // TODO: Authenticate User
+    };
+
+    const buttonText = formType === "SIGN_IN" ? "Sign In" : "Sign Up";
+
+    return (
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="mt-10 space-y-6">
+            {Object.keys(defaultValues).map((field) => {
+                const fieldName = field as Path<T>;
+                const error = form.formState.errors[fieldName];
+
+                return (
+                    <div key={field} className="space-y-2">
+                        <Label
+                            htmlFor={field}
+                            className="paragraph-medium text-dark400_light700"
+                        >
+                            {field === "email"
+                                ? "Email Address"
+                                : field.charAt(0).toUpperCase() + field.slice(1)}
+                        </Label>
+
+                        <Input
+                            id={field}
+                            {...form.register(fieldName)}
+                            type={field === "password" ? "password" : "text"}
+                            className="paragraph-regular background-light900_dark300 light-border-2 text-dark300_light700 no-focus min-h-12 rounded-1.5 border"
+                        />
+
+                        {error && (
+                            <p className="text-sm font-medium text-destructive">
+                                {error.message as string}
+                            </p>
+                        )}
+                    </div>
+                );
+            })}
+
+            <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                className="primary-gradient paragraph-medium min-h-12 w-full rounded-2 px-4 py-3 font-inter !text-light-900"
+            >
+                {form.formState.isSubmitting
+                    ? formType === "SIGN_IN"
+                        ? "Signing In..."
+                        : "Signing Up..."
+                    : buttonText}
+            </Button>
+
+            <div className="mt-4">
+                <p className="text-dark400_light700">
+                    {formType === "SIGN_IN" ? (
+                        <>
+                            Don't have an account?{" "}
+                            <Link
+                                href={ROUTES.SIGN_UP}
+                                className="paragraph-semibold primary-text-gradient"
+                            >
+                                Sign up
+                            </Link>
+                        </>
+                    ) : (
+                        <>
+                            Already have an account?{" "}
+                            <Link
+                                href={ROUTES.SIGN_IN}
+                                className="paragraph-semibold primary-text-gradient"
+                            >
+                                Sign in
+                            </Link>
+                        </>
+                    )}
+                </p>
+            </div>
+        </form>
+    );
+};
+
+export default AuthForm;
