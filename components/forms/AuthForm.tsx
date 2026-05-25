@@ -15,11 +15,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import ROUTES from "@/constants/routes";
+import { toast } from "sonner"
 
 interface AuthFormProps<T extends FieldValues> {
     schema: ZodType<T>;
     defaultValues: T;
-    onSubmit: (data: T) => Promise<{ success: boolean }>;
+    onSubmit: (data: T) => Promise<{ success: boolean; error?: string }>;
     formType: "SIGN_IN" | "SIGN_UP";
 }
 
@@ -34,8 +35,23 @@ const AuthForm = <T extends FieldValues>({
         defaultValues: defaultValues as DefaultValues<T>,
     });
 
-    const handleSubmit: SubmitHandler<T> = async () => {
-        // TODO: Authenticate User
+    const handleSubmit: SubmitHandler<T> = async (data) => {
+        try {
+            const result = await onSubmit(data);
+
+            if (result.success) {
+                toast.success(
+                    formType === "SIGN_IN"
+                        ? "Signed in successfully!"
+                        : "Account created successfully!"
+                );
+            } else {
+                toast.error(result.error || "Authentication failed. Please try again.");
+            }
+        } catch (error) {
+            console.error("Form submission error:", error);
+            toast.error("An unexpected error occurred. Please check your connection.");
+        }
     };
 
     const buttonText = formType === "SIGN_IN" ? "Sign In" : "Sign Up";
@@ -76,7 +92,7 @@ const AuthForm = <T extends FieldValues>({
             <Button
                 type="submit"
                 disabled={form.formState.isSubmitting}
-                className="primary-gradient paragraph-medium min-h-12 w-full rounded-2 px-4 py-3 font-inter !text-light-900"
+                className="primary-gradient paragraph-medium min-h-12 w-full rounded-2 px-4 py-3 font-inter !text-light-900 cursor-pointer"
             >
                 {form.formState.isSubmitting
                     ? formType === "SIGN_IN"

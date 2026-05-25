@@ -27,9 +27,9 @@ const SocialAuthForm = () => {
 
     return (
         <div className="mt-10 flex flex-wrap gap-2.5">
-            <Button className={buttonClass} onClick={() => handleSignIn('github')}>
+            <Button className={`${buttonClass} cursor-pointer`} onClick={() => handleSignIn('github')}>
                 <Image
-                    src="/icons/github.svg"
+                    src="assets/icons/github.svg"
                     alt="Github Logo"
                     width={20}
                     height={20}
@@ -37,9 +37,9 @@ const SocialAuthForm = () => {
                 />
                 <span>Log in with GitHub</span>
             </Button>
-            <Button className={buttonClass} onClick={() => handleSignIn('google')}>
+            <Button className={`${buttonClass} cursor-pointer`} onClick={() => handleSignIn('google')}>
                 <Image
-                    src="/icons/google.svg"
+                    src="/assets/icons/google.svg"
                     alt="Google Logo"
                     width={20}
                     height={20}
