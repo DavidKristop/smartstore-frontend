@@ -1,4 +1,29 @@
 /* eslint-disable no-unused-vars */
+import { Models } from "node-appwrite";
+
+export interface User extends Models.Document {
+    $id: string;
+    email: string;
+    accountId: string;
+    fullName: string;
+    username: string;
+    avatar?: string;
+    password_hash?: string;
+    files?: any;
+}
+
+interface File_ extends Models.Document {
+    $id: string;
+    name: string;
+    url: string;
+    type: FileType;
+    bucketFileId: string;
+    accountId: string;
+    owner?: string;
+    extension: string;
+    size: number;
+    users: string[]
+}
 
 declare type FileType = "document" | "image" | "video" | "audio" | "other";
 

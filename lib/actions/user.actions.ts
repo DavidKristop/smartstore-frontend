@@ -3,22 +3,53 @@
 import bcrypt from "bcrypt";
 import {createAdminClient, createSessionClient} from "@/lib/appwrite";
 import {appwriteConfig} from "@/lib/appwrite/config";
-import {Query, ID} from "node-appwrite";
+import {Query, ID, Models} from "node-appwrite";
 import {parseStringify} from "@/lib/utils";
 import {cookies} from "next/headers";
 import {avatarPlaceholderUrl} from "@/constants/avatar";
 import { auth, signOut } from "@/auth";
+import { User } from "@/types"
 
-const getUserByEmail = async (email: string) => {
-    const { databases } = await createAdminClient()
+export const getUserById = async (id: string | undefined): Promise<User | null> => {
+    if (!id) return null;
+    try {
+        const { databases } = await createAdminClient();
 
-    const result = await databases.listDocuments(
-        appwriteConfig.databaseId,
-        appwriteConfig.usersCollectionId,
-        [Query.equal("email", [email])]
-    )
+        const document = await databases.getDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.usersCollectionId,
+            id
+        );
 
-    return result.total > 0 ? result.documents[0] : null
+        return parseStringify(document) as User;
+
+    } catch (error) {
+        return null;
+    }
+}
+
+export const getUserByEmail = async (email: string): Promise<User | null> => {
+    try {
+        const { databases } = await createAdminClient();
+
+        const result = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.usersCollectionId,
+            [
+                Query.equal("email", [email]),
+                Query.limit(1)
+            ]
+        );
+
+        if (result.total > 0) {
+            return parseStringify(result.documents[0]) as User;
+        }
+
+        return null;
+    } catch (error) {
+        console.error("Error fetching user by email:", error);
+        return null;
+    }
 }
 
 const handleError = (error: unknown, message: string) => {
@@ -72,7 +103,7 @@ export const signInUser = async ({
     try {
         const existingUser = await getUserByEmail(email);
 
-        if (!existingUser) {
+        if (!existingUser || !existingUser.password_hash) {
             return parseStringify({
                 accountId: null,
             })
@@ -104,7 +135,7 @@ export const signInUser = async ({
     }
 };
 
-export const getCurrentUser = async () => {
+export const getCurrentUser = async (): Promise<User | null> => {
     try {
         const nextAuthSession = await auth();
 
