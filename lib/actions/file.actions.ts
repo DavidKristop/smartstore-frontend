@@ -1,13 +1,21 @@
 'use server'
 
-import {createAdminClient} from "@/lib/appwrite";
+import {createAdminClient, createSessionClient} from "@/lib/appwrite";
 import {InputFile} from "node-appwrite/file";
 import {appwriteConfig} from "@/lib/appwrite/config";
 import {ID, Models, Query} from "node-appwrite";
 import {constructFileUrl, getFileType, parseStringify} from "@/lib/utils";
 import {revalidatePath} from "next/cache";
 import {getCurrentUser} from "@/lib/actions/user.actions";
-import {UploadFileProps, User} from "@/types";
+import {
+    DeleteFileProps,
+    File_, FileType,
+    GetFilesProps,
+    RenameFileProps,
+    UpdateFileUsersProps,
+    UploadFileProps,
+    User
+} from "@/types";
 
 const handleError = (error: unknown, message: string) => {
     console.log(error, message);
@@ -56,7 +64,7 @@ export const uploadFile = async ({ file, ownerId, accountId, path }: UploadFileP
     }
 }
 
-const createQueries = (currentUser: User) => {
+const createQueries = (currentUser: User, types: string[], searchText: string, sort: string, limit?: number) => {
     const queries = [
         Query.or([
             Query.equal("owner", [currentUser.$id]),
@@ -64,10 +72,18 @@ const createQueries = (currentUser: User) => {
         ])
     ]
 
+    if(types.length > 0) queries.push(Query.equal("type", types));
+    if(searchText) queries.push(Query.contains("name", searchText));
+    if(limit) queries.push(Query.limit(limit));
+
+    const [sortBy, orderBy] = sort.split('-')
+
+    queries.push(orderBy === "asc" ? Query.orderAsc(sortBy) : Query.orderDesc(sortBy));
+
     return queries
 }
 
-export const getFiles = async () => {
+export const getFiles = async ({ types = [], searchText = "", sort="$createdAt-desc", limit }: GetFilesProps) => {
     const { databases } = await createAdminClient()
 
     try {
@@ -75,9 +91,9 @@ export const getFiles = async () => {
 
         if(!currentUser) throw new Error("Current user does not exist");
 
-        const queries = createQueries(currentUser);
+        const queries = createQueries(currentUser, types, searchText, sort, limit);
 
-        const files = await databases.listDocuments(
+        const files = await databases.listDocuments<File_>(
             appwriteConfig.databaseId,
             appwriteConfig.filesCollectionId,
             queries
@@ -86,5 +102,151 @@ export const getFiles = async () => {
         return parseStringify(files);
     } catch(error) {
         handleError(error, "Failed to get files");
+    }
+}
+
+export const renameFile = async ({ fileId, name, extension, path }: RenameFileProps) => {
+    try {
+        const newName = `${name}.${extension}`;
+        const { databases } = await createAdminClient()
+        const updatedFile = await databases.updateDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.filesCollectionId,
+            fileId,
+            {
+                name: newName
+            }
+        );
+
+        revalidatePath(path);
+        return parseStringify(updatedFile);
+    } catch(error) {
+        handleError(error, "Failed to rename the file.");
+    }
+}
+
+export const updateFileUsers = async ({ fileId, emails, path }: UpdateFileUsersProps) => {
+    try {
+        const { databases } = await createAdminClient()
+        const updatedFile = await databases.updateDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.filesCollectionId,
+            fileId,
+            {
+                users: emails
+            }
+        );
+
+        revalidatePath(path);
+        return parseStringify(updatedFile);
+    } catch(error) {
+        handleError(error, "Failed to rename the file.");
+    }
+}
+
+export const updateEditedFile = async ({
+                                           fileId,
+                                           oldBucketFileId,
+                                           file,
+                                           path
+                                       }: {
+    fileId: string;
+    oldBucketFileId: string;
+    file: File;
+    path: string
+}) => {
+    try {
+        const { storage, databases } = await createAdminClient();
+
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const inputFile = InputFile.fromBuffer(buffer, file.name);
+
+        const newBucketFile = await storage.createFile(
+            appwriteConfig.bucketId,
+            ID.unique(),
+            inputFile
+        );
+
+        const updatedDocument = await databases.updateDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.filesCollectionId,
+            fileId,
+            {
+                bucketFileId: newBucketFile.$id,
+                url: constructFileUrl(newBucketFile.$id),
+                size: newBucketFile.sizeOriginal,
+                extension: getFileType(newBucketFile.name).extension,
+            }
+        );
+
+        await storage.deleteFile(appwriteConfig.bucketId, oldBucketFileId);
+
+        revalidatePath(path);
+        return parseStringify(updatedDocument);
+    } catch (error) {
+        handleError(error, "Failed to update edited file");
+    }
+}
+
+export const deleteFile = async ({ fileId, bucketFileId, path }: DeleteFileProps) => {
+    try {
+        const { databases, storage } = await createAdminClient()
+        const deletedFile = await databases.deleteDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.filesCollectionId,
+            fileId,
+        );
+
+        if(deletedFile) {
+            await storage.deleteFile(appwriteConfig.bucketId, bucketFileId);
+        }
+
+        revalidatePath(path);
+        return parseStringify({ status: "success" });
+    } catch(error) {
+        handleError(error, "Failed to rename the file.");
+    }
+}
+
+export async function getTotalSpaceUsed() {
+    try {
+        const { databases } = await createAdminClient();
+
+        const currentUser = await getCurrentUser();
+        if (!currentUser) throw new Error("User is not authenticated.");
+
+        const files = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.filesCollectionId,
+            [Query.equal("owner", [currentUser.$id])],
+        );
+
+        const totalSpace = {
+            image: { size: 0, latestDate: "" },
+            document: { size: 0, latestDate: "" },
+            video: { size: 0, latestDate: "" },
+            audio: { size: 0, latestDate: "" },
+            other: { size: 0, latestDate: "" },
+            used: 0,
+            all: 2 * 1024 * 1024 * 1024 // 2GB limit
+        };
+
+        files.documents.forEach((file) => {
+            const fileType = file.type as FileType;
+            totalSpace[fileType].size += file.size;
+            totalSpace.used += file.size;
+
+            if (
+                !totalSpace[fileType].latestDate ||
+                new Date(file.$updatedAt) > new Date(totalSpace[fileType].latestDate)
+            ) {
+                totalSpace[fileType].latestDate = file.$updatedAt;
+            }
+        });
+
+        return parseStringify(totalSpace);
+    } catch (error) {
+        handleError(error, "Error calculating total space used: ");
     }
 }

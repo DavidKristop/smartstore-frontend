@@ -219,7 +219,7 @@
 @utility nav-icon-active { @apply invert-0 opacity-100; }
 
 /* Root Layout & Dashboard */
-@utility main-content { @apply no-scrollbar h-full flex-1 overflow-auto bg-light-400 px-5 py-7 sm:mr-7 sm:rounded-[30px] md:mb-7 md:px-9 md:py-10; }
+@utility main-content { @apply no-scrollbar h-full flex-1 overflow-auto bg-light-300 px-5 py-7 sm:mr-7 sm:rounded-[30px] md:mb-7 md:px-9 md:py-10; }
 @utility dashboard-container { @apply mx-auto grid max-w-7xl grid-cols-1 gap-6 md:grid-cols-2 xl:gap-10; }
 @utility dashboard-summary-list { @apply mt-6 grid grid-cols-1 gap-4 xl:mt-10 xl:grid-cols-2 xl:gap-9; }
 @utility dashboard-summary-card { @apply relative mt-6 rounded-[20px] bg-white p-5 transition-all hover:scale-105; }
@@ -241,8 +241,8 @@
 /* ActionsDropdown & ModalContent */
 @utility rename-input-field { @apply body-2 shad-no-focus h-[52px] w-full rounded-full border px-4 shadow-drop-1; }
 @utility delete-confirmation { @apply text-center text-light-100; }
-@utility delete-file-name { @apply font-medium text-brand-100; }
-@utility modal-cancel-button { @apply h-[52px] flex-1 rounded-full bg-white text-light-100 hover:bg-transparent; }
+@utility delete-file-name { @apply font-medium text-cyan-700; }
+@utility modal-cancel-button { @apply h-[52px] flex-1 text-light-100 hover:bg-red-300; }
 @utility modal-submit-button { @apply primary-btn !mx-0 h-[52px] w-full flex-1; }
 @utility file-details-thumbnail { @apply !mb-1 flex items-center gap-3 rounded-xl border border-light-200/40 bg-light-400/50 p-3; }
 @utility file-details-label { @apply body-2 w-[30%] text-light-100; }
@@ -280,7 +280,7 @@
 /* Header & Sidebar */
 @utility header { @apply hidden items-center justify-between gap-5 p-5 sm:flex lg:py-7 xl:gap-10; }
 @utility header-wrapper { @apply flex-center min-w-fit gap-4; }
-@utility sign-out-button { @apply flex-center h-[52px] min-w-[54px] items-center shadow-none transition-all hover:bg-red-700; }
+@utility sign-out-button { @apply flex-center h-[52px] min-w-[54px] items-center shadow-none transition-all hover:bg-red-100; }
 @utility mobile-header { @apply flex h-[60px] justify-between px-5 sm:hidden; }
 @utility header-user { @apply my-3 flex items-center gap-2 rounded-full p-1 text-light-100 sm:justify-center sm:bg-brand/10 lg:justify-start lg:p-3; }
 @utility header-user-avatar { @apply aspect-square w-10 rounded-full object-cover; }

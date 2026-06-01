@@ -28,6 +28,14 @@ export const getUserById = async (id: string | undefined): Promise<User | null> 
     }
 }
 
+export const getUserFullName = async (id: string | undefined) => {
+    if (!id) return null;
+    const owner = await getUserById(id);
+
+    if (!owner) return null;
+    return owner.fullName;
+}
+
 export const getUserByEmail = async (email: string): Promise<User | null> => {
     try {
         const { databases } = await createAdminClient();

@@ -17,7 +17,7 @@ const Header = ({ userId, accountId }: { userId: string, accountId: string }) =>
 
                     await signOutUser()
                 }}>
-                    <Button type="submit" className="sign-out-button py-6 cursor-pointer rounded-full bg-red-800">
+                    <Button type="submit" className="sign-out-button py-6 cursor-pointer rounded-full bg-red-200">
                         <Image
                             src="/assets/icons/logout.svg"
                             alt="logo"

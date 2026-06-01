@@ -1,0 +1,32 @@
+export const actionsDropdownItems = [
+    {
+        label: "Rename",
+        icon: "/assets/icons/rename.svg",
+        value: "rename",
+    },
+    {
+        label: "Details",
+        icon: "/assets/icons/info.svg",
+        value: "details",
+    },
+    {
+        label: "Edit",
+        icon: "/assets/icons/edit.svg",
+        value: "edit",
+    },
+    {
+        label: "Share",
+        icon: "/assets/icons/share.svg",
+        value: "share",
+    },
+    {
+        label: "Download",
+        icon: "/assets/icons/download.svg",
+        value: "download",
+    },
+    {
+        label: "Delete",
+        icon: "/assets/icons/delete.svg",
+        value: "delete",
+    },
+];

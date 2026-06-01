@@ -106,7 +106,7 @@ const MobileNavigation = ({ ownerId, accountId, fullName, avatar, email }: Props
                     <div className="flex flex-col justify-between gap-5 pb-5">
                         <FileUploader ownerId={ownerId} accountId={accountId} />
 
-                        <Button type="submit" className="mobile-sign-out-button bg-red-800 rounded-full py-2" onClick={async () => await signOutUser()}>
+                        <Button type="submit" className="mobile-sign-out-button bg-red-800 rounded-full py-6" onClick={async () => await signOutUser()}>
                             <Image
                                 src="/assets/icons/logout.svg"
                                 alt="logo"
