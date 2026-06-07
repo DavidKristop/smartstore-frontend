@@ -1,6 +1,6 @@
 "use client";
 
-import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import {
     DefaultValues,
@@ -31,7 +31,7 @@ const AuthForm = <T extends FieldValues>({
                                              onSubmit,
                                          }: AuthFormProps<T>) => {
     const form = useForm<T>({
-        resolver: standardSchemaResolver(schema),
+        resolver: zodResolver(schema as any),
         defaultValues: defaultValues as DefaultValues<T>,
     });
 
