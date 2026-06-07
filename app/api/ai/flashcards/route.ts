@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
         uploadedDocName = uploadedDoc.name || "";
 
         const response = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
+            model: "gemini-3.5-flash",
             contents: [
                 `Extract the most important concepts, terms, and definitions from this document and create a deck of ${amount} high-quality flashcards. Keep the front brief (the term/question) and the back concise (the definition/answer).`,
                 { fileData: { fileUri: uploadedDoc.uri, mimeType: uploadedDoc.mimeType } }
