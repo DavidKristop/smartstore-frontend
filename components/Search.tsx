@@ -8,7 +8,9 @@ import { getFiles } from "@/lib/actions/file.actions";
 import Thumbnail from "@/components/Thumbnail";
 import FormattedDateTime from "@/components/FormattedDateTime";
 import { useDebounce } from "use-debounce";
-import { File_ } from "@/types"; // Fixed spacing here
+import { File_ } from "@/types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sparkles, Loader2, SearchIcon } from "lucide-react";
 
 const Search = () => {
     const [query, setQuery] = useState("");
@@ -16,8 +18,12 @@ const Search = () => {
     const searchQuery = searchParams.get("query") || "";
 
     const [results, setResults] = useState<File_[]>([]);
+    const [dropdownOpen, setDropdownOpen] = useState(false);
 
-    const [open, setOpen] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isLoadingAI, setIsLoadingAI] = useState(false);
+    const [aiResult, setAiResult] = useState<string | null>(null);
+
     const router = useRouter();
     const path = usePathname();
     const [debouncedQuery] = useDebounce(query, 300);
@@ -26,7 +32,7 @@ const Search = () => {
         const fetchFiles = async () => {
             if (debouncedQuery.length === 0) {
                 setResults([]);
-                setOpen(false);
+                setDropdownOpen(false);
 
                 if (searchParams.has("query")) {
                     const newSearchParams = new URLSearchParams(searchParams.toString());
@@ -38,7 +44,6 @@ const Search = () => {
 
                     return router.push(newPath);
                 }
-
                 return;
             }
 
@@ -46,7 +51,7 @@ const Search = () => {
 
             if (files) {
                 setResults(files.documents);
-                setOpen(true);
+                setDropdownOpen(true);
             }
         };
 
@@ -59,8 +64,35 @@ const Search = () => {
         }
     }, [searchQuery]);
 
+    const handleAISearch = async (searchQueryText: string) => {
+        if (!searchQueryText.trim()) return;
+
+        setDropdownOpen(false);
+        setIsModalOpen(true);
+        setIsLoadingAI(true);
+        setAiResult(null);
+
+        try {
+            const response = await fetch('/api/ai/retrieval', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userQuestion: searchQueryText })
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || "Failed to query vector store.");
+
+            setAiResult(data.answer);
+        } catch (error: any) {
+            console.error("AI Search Error:", error);
+            setAiResult("Sorry, I encountered an error searching inside your documents.");
+        } finally {
+            setIsLoadingAI(false);
+        }
+    };
+
     const handleClickItem = (file: File_) => {
-        setOpen(false);
+        setDropdownOpen(false);
         setResults([]);
         setQuery("");
 
@@ -70,8 +102,8 @@ const Search = () => {
     };
 
     return (
-        <div className="search">
-            <div className="search-input-wrapper">
+        <div className="search relative w-full max-w-md">
+            <form onSubmit={(e) => { e.preventDefault(); handleAISearch(query); }} className="search-input-wrapper flex items-center relative">
                 <Image
                     src="/assets/icons/search.svg"
                     alt="Search"
@@ -80,21 +112,33 @@ const Search = () => {
                 />
                 <Input
                     value={query}
-                    placeholder="Search..."
-                    className="search-input"
+                    placeholder="Search files or ask AI..."
+                    className="search-input w-full"
                     onChange={(e) => setQuery(e.target.value)}
                 />
 
-                {open && (
-                    <ul className="search-result">
+                {dropdownOpen && (
+                    <ul className="search-result absolute top-full left-0 w-full mt-2 bg-white rounded-xl shadow-lg border border-slate-100 z-50 overflow-hidden">
+
+                        {/* THE AI BRIDGE OPTION: Always visible at the top if there is text typed */}
+                        {query.trim().length > 0 && (
+                            <li
+                                onClick={() => handleAISearch(query)}
+                                className="flex items-center gap-3 p-3 bg-brand-100/40 hover:bg-brand-100 text-brand font-medium cursor-pointer transition-colors border-b border-slate-100/80"
+                            >
+                                <Sparkles className="h-4 w-4 animate-pulse shrink-0" />
+                                <span className="text-sm line-clamp-1">Ask AI about &ldquo;{query}&rdquo;...</span>
+                            </li>
+                        )}
+
                         {results.length > 0 ? (
                             results.map((file) => (
                                 <li
-                                    className="flex items-center justify-between"
+                                    className="flex items-center justify-between p-3 hover:bg-slate-50 cursor-pointer transition-colors"
                                     key={file.$id}
                                     onClick={() => handleClickItem(file)}
                                 >
-                                    <div className="flex cursor-pointer items-center gap-4">
+                                    <div className="flex items-center gap-4">
                                         <Thumbnail
                                             type={file.type}
                                             extension={file.extension}
@@ -113,11 +157,41 @@ const Search = () => {
                                 </li>
                             ))
                         ) : (
-                            <p className="empty-result">No files found</p>
+                            <p className="empty-result p-4 text-center text-xs text-slate-400">No matching filenames found</p>
                         )}
                     </ul>
                 )}
-            </div>
+            </form>
+
+            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                <DialogContent className="sm:max-w-[600px] p-6 shad-dialog outline-none border-none">
+                    <DialogHeader className="mb-4 pb-4 border-b border-light-200 flex flex-row items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-brand" />
+                        <DialogTitle className="h2-bold text-dark-100">
+                            Discovery Engine
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="min-h-[200px] flex flex-col justify-center">
+                        {isLoadingAI ? (
+                            <div className="flex flex-col items-center justify-center gap-3 py-8 text-light-200">
+                                <Loader2 className="h-10 w-10 animate-spin text-brand" />
+                                <p className="subtitle-2">Scanning multi-tenant vector namespaces...</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="bg-light-400/10 p-4 rounded-xl border border-light-200 text-sm font-medium text-dark-200">
+                                    <span className="text-light-200 mr-2 font-bold">Query:</span>
+                                    {query}
+                                </div>
+                                <div className="text-dark-100 body-2 leading-relaxed whitespace-pre-wrap px-1 max-h-[50vh] overflow-y-auto custom-scrollbar">
+                                    {aiResult}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

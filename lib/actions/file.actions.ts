@@ -1,9 +1,9 @@
 'use server'
 
-import {createAdminClient, createSessionClient} from "@/lib/appwrite";
+import {createAdminClient} from "@/lib/appwrite";
 import {InputFile} from "node-appwrite/file";
 import {appwriteConfig} from "@/lib/appwrite/config";
-import {ID, Models, Query} from "node-appwrite";
+import {ID, Query} from "node-appwrite";
 import {constructFileUrl, getFileType, parseStringify} from "@/lib/utils";
 import {revalidatePath} from "next/cache";
 import {getCurrentUser} from "@/lib/actions/user.actions";
@@ -17,8 +17,11 @@ import {
     User
 } from "@/types";
 
+import eventBus, { EVENTS } from "@/lib/event-bus";
+import "@/lib/ai-subscriber";
+
 const handleError = (error: unknown, message: string) => {
-    console.log(error, message);
+    console.error(error, message);
     throw error;
 };
 
@@ -56,8 +59,14 @@ export const uploadFile = async ({ file, ownerId, accountId, path }: UploadFileP
             handleError(error, "Failed to create file document")
         });
 
-        revalidatePath(path);
+        eventBus.emit(EVENTS.FILE_CREATED, {
+            fileId: newFile?.$id,
+            accountId: accountId,
+            bucketFileId: bucketFile.$id,
+            mimeType: file.type
+        });
 
+        revalidatePath(path);
         return parseStringify(newFile);
     } catch (error) {
         handleError(error, "Failed to upload file");
@@ -77,7 +86,6 @@ const createQueries = (currentUser: User, types: string[], searchText: string, s
     if(limit) queries.push(Query.limit(limit));
 
     const [sortBy, orderBy] = sort.split('-')
-
     queries.push(orderBy === "asc" ? Query.orderAsc(sortBy) : Query.orderDesc(sortBy));
 
     return queries
@@ -88,7 +96,6 @@ export const getFiles = async ({ types = [], searchText = "", sort="$createdAt-d
 
     try {
         const currentUser = await getCurrentUser();
-
         if(!currentUser) throw new Error("Current user does not exist");
 
         const queries = createQueries(currentUser, types, searchText, sort, limit);
@@ -107,16 +114,24 @@ export const getFiles = async ({ types = [], searchText = "", sort="$createdAt-d
 
 export const renameFile = async ({ fileId, name, extension, path }: RenameFileProps) => {
     try {
+        const currentUser = await getCurrentUser();
+        if (!currentUser) throw new Error("User not authenticated");
+
         const newName = `${name}.${extension}`;
         const { databases } = await createAdminClient()
+
         const updatedFile = await databases.updateDocument(
             appwriteConfig.databaseId,
             appwriteConfig.filesCollectionId,
             fileId,
-            {
-                name: newName
-            }
+            { name: newName }
         );
+
+        eventBus.emit(EVENTS.FILE_RENAMED, {
+            fileId: fileId,
+            accountId: currentUser.accountId,
+            newName: newName
+        });
 
         revalidatePath(path);
         return parseStringify(updatedFile);
@@ -132,31 +147,22 @@ export const updateFileUsers = async ({ fileId, emails, path }: UpdateFileUsersP
             appwriteConfig.databaseId,
             appwriteConfig.filesCollectionId,
             fileId,
-            {
-                users: emails
-            }
+            { users: emails }
         );
 
         revalidatePath(path);
         return parseStringify(updatedFile);
     } catch(error) {
-        handleError(error, "Failed to rename the file.");
+        handleError(error, "Failed to update the file users.");
     }
 }
 
-export const updateEditedFile = async ({
-                                           fileId,
-                                           oldBucketFileId,
-                                           file,
-                                           path
-                                       }: {
-    fileId: string;
-    oldBucketFileId: string;
-    file: File;
-    path: string
-}) => {
+export const updateEditedFile = async ({ fileId, oldBucketFileId, file, path }: { fileId: string; oldBucketFileId: string; file: File; path: string }) => {
     try {
         const { storage, databases } = await createAdminClient();
+
+        const currentUser = await getCurrentUser();
+        if (!currentUser) throw new Error("User not authenticated");
 
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
@@ -168,19 +174,29 @@ export const updateEditedFile = async ({
             inputFile
         );
 
+        const newUrl = constructFileUrl(newBucketFile.$id);
+
         const updatedDocument = await databases.updateDocument(
             appwriteConfig.databaseId,
             appwriteConfig.filesCollectionId,
             fileId,
             {
                 bucketFileId: newBucketFile.$id,
-                url: constructFileUrl(newBucketFile.$id),
+                url: newUrl,
                 size: newBucketFile.sizeOriginal,
                 extension: getFileType(newBucketFile.name).extension,
             }
         );
 
         await storage.deleteFile(appwriteConfig.bucketId, oldBucketFileId);
+
+        eventBus.emit(EVENTS.FILE_DELETED, { fileId, accountId: currentUser.accountId });
+        eventBus.emit(EVENTS.FILE_CREATED, {
+            fileId,
+            accountId: currentUser.accountId,
+            fileUrl: newUrl,
+            mimeType: file.type
+        });
 
         revalidatePath(path);
         return parseStringify(updatedDocument);
@@ -192,6 +208,10 @@ export const updateEditedFile = async ({
 export const deleteFile = async ({ fileId, bucketFileId, path }: DeleteFileProps) => {
     try {
         const { databases, storage } = await createAdminClient()
+
+        const currentUser = await getCurrentUser();
+        if (!currentUser) throw new Error("User not authenticated");
+
         const deletedFile = await databases.deleteDocument(
             appwriteConfig.databaseId,
             appwriteConfig.filesCollectionId,
@@ -202,10 +222,15 @@ export const deleteFile = async ({ fileId, bucketFileId, path }: DeleteFileProps
             await storage.deleteFile(appwriteConfig.bucketId, bucketFileId);
         }
 
+        eventBus.emit(EVENTS.FILE_DELETED, {
+            fileId: fileId,
+            accountId: currentUser.accountId
+        });
+
         revalidatePath(path);
         return parseStringify({ status: "success" });
     } catch(error) {
-        handleError(error, "Failed to rename the file.");
+        handleError(error, "Failed to delete the file.");
     }
 }
 

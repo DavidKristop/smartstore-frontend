@@ -28,15 +28,14 @@ const FileUploader = ({ ownerId, accountId }: Props) => {
                 setFiles((prevFiles) =>
                     prevFiles.filter((f) => f.name !== file.name)
                 );
-
-                toast.error(`${file.name} is too large. Max file size is 50MB.`);
+                return toast.error(`${file.name} is too large. Max file size is 50MB.`);
             }
 
             return uploadFile({ file, ownerId, accountId, path }).then((uploadedFile) => {
                 if(uploadedFile) {
                     setFiles((prevFiles) =>
                         prevFiles.filter((f) => f.name !== file.name)
-                    )
+                    );
                 }
             });
         })
