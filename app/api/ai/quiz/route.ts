@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Type } from '@google/genai';
-import { writeFile, unlink } from 'fs/promises';
+import { createWriteStream } from 'fs';
+import { unlink } from 'fs/promises';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import os from 'os';
@@ -8,16 +11,25 @@ import os from 'os';
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function POST(req: NextRequest) {
-    let uploadedDocName = ""; let tempPath = "";
+    let uploadedDocName = "";
+    let tempPath = "";
+
     try {
         const formData = await req.formData();
-        const file = formData.get('file') as File;
-        const amount = formData.get('amount') as string || '10';
+        const file = formData.get('file') as File | null;
 
+        if (!file) {
+            return NextResponse.json({ error: "No file provided" }, { status: 400 });
+        }
+
+        const amount = formData.get('amount') as string || '10';
         const safeMimeType = file.type || 'application/pdf';
-        const buffer = Buffer.from(await file.arrayBuffer());
+
         tempPath = path.join(os.tmpdir(), `${uuidv4()}_${file.name}`);
-        await writeFile(tempPath, buffer);
+
+        const webStream = file.stream();
+        const nodeStream = Readable.fromWeb(webStream as any);
+        await pipeline(nodeStream, createWriteStream(tempPath));
 
         const uploadedDoc = await ai.files.upload({
             file: tempPath,
@@ -66,6 +78,7 @@ export async function POST(req: NextRequest) {
     } catch (error: any) {
         if (uploadedDocName) try { await ai.files.delete({ name: uploadedDocName }); } catch(e) {}
         if (tempPath) try { await unlink(tempPath); } catch(e) {}
+
         console.error("Quiz Error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }

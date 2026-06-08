@@ -1,6 +1,6 @@
 import { File_ } from "@/types";
 
-export const downloadAppwriteFile = async (appwriteFile: File_): Promise<File> => {
+const downloadAppwriteFile = async (appwriteFile: File_): Promise<File> => {
     const fileResponse = await fetch(appwriteFile.url);
     if (!fileResponse.ok) throw new Error(`Failed to download file: ${appwriteFile.name}`);
     const blob = await fileResponse.blob();
